@@ -116,7 +116,6 @@ public final class GhostBarrels {
     }
 
     public boolean onSlotClickHead(ScreenHandler handler, int slotIndex, ServerPlayerEntity player) {
-        if (mod.data.ghostBarrels.isEmpty()) return false;
         if (slotIndex < 0 || slotIndex >= handler.slots.size()) return false;
         Slot slot = handler.getSlot(slotIndex);
         if (!Tagging.is(slot.getStack(), Tagging.GHOST_TOTEM)) return false;
@@ -136,11 +135,11 @@ public final class GhostBarrels {
     }
 
     public void onSlotClickReturn(ScreenHandler handler, ServerPlayerEntity player) {
-        if (mod.data.ghostBarrels.isEmpty()) return;
-
         BarrelBlockEntity barrel = null;
-        for (Slot s : handler.slots) {
-            if (s.inventory instanceof BarrelBlockEntity b) { barrel = b; break; }
+        if (!mod.data.ghostBarrels.isEmpty()) {
+            for (Slot s : handler.slots) {
+                if (s.inventory instanceof BarrelBlockEntity b) { barrel = b; break; }
+            }
         }
 
         boolean dirty = false;
@@ -202,6 +201,22 @@ public final class GhostBarrels {
         }
         mod.data.ghostBarrels.remove(rec.id);
         mod.data.save();
+    }
+
+    public int clearAll() {
+        int n = mod.data.ghostBarrels.size();
+        for (MachineData.GhostBarrel rec : mod.data.ghostBarrels.values()) {
+            ServerWorld world = mod.worldOf(rec.dimension);
+            if (world == null) continue;
+            BlockPos pos = new BlockPos(rec.x, rec.y, rec.z);
+            if (world.isChunkLoaded(pos) && world.getBlockEntity(pos) instanceof BarrelBlockEntity barrel) {
+                removeTagged(barrel, rec.id, true, true);
+            }
+        }
+        mod.data.ghostBarrels.clear();
+        pendingPlace.clear();
+        mod.data.save();
+        return n;
     }
 
     public boolean canHopperTake(Inventory from, ItemStack stack) {
