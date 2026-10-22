@@ -123,12 +123,12 @@ public final class MachineData {
     }
 
     public static final class OrbitalSettings {
-        public double radius = 22.0;
-        public int rings = 5;
+        public double radius = 17.0;
+        public int rings = 8;
         public double spacing = 2.0;
         public double height = 322.0;
         public double velocity = 5.0;
-        public double damage = 8.0;
+        public double damage = 120.0;
         public int waveDelay = 0;
         public boolean selfImmune = true;
         public int arrowLifetime = 200;
