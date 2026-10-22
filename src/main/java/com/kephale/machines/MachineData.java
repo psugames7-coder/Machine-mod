@@ -17,9 +17,11 @@ public final class MachineData {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     public Map<String, ArrowCannon> arrowCannons = new LinkedHashMap<>();
+    public Map<String, ArrowDispenser> arrowDispensers = new LinkedHashMap<>();
     public Map<String, TntCannon> tntCannons = new LinkedHashMap<>();
     public Map<String, GhostBarrel> ghostBarrels = new LinkedHashMap<>();
-    public PortalTrapSettings portalTrap = new PortalTrapSettings();
+    public Map<String, PortalZone> portalTraps = new LinkedHashMap<>();
+    public PortalTrapSettings portalTrap;
     public OrbitalSettings orbital = new OrbitalSettings();
     public Set<String> immune = new LinkedHashSet<>();
 
@@ -61,6 +63,19 @@ public final class MachineData {
         }
     }
 
+    public static final class ArrowDispenser {
+        public String dimension = "minecraft:overworld";
+        public int x, y, z;
+        public boolean enabled = true;
+        public int count = 1;
+        public int interval = 5;
+        public String mode = "burst";
+        public double speed = 12.0;
+        public double spread = 0.0;
+        public double damage = 6.0;
+        public int arrowLifetime = 80;
+    }
+
     public static final class TntCannon {
         public String dimension = "minecraft:overworld";
         public int x, y, z;
@@ -84,14 +99,13 @@ public final class MachineData {
         public boolean pendingRemove;
     }
 
-    public static final class PortalTrapSettings {
-        public boolean enabled = false;
+    public static final class PortalZone {
+        public boolean enabled = true;
         public boolean pos1Set;
         public boolean pos2Set;
         public int x1, z1, x2, z2;
-        public boolean escapable = false;
-        public int thickness = 1;
-        public int shell = 8;
+        public int depth = 2;
+        public int shell = 0;
 
         public boolean zoneReady() { return pos1Set && pos2Set; }
 
@@ -99,6 +113,13 @@ public final class MachineData {
             return x >= Math.min(x1, x2) && x <= Math.max(x1, x2)
                     && z >= Math.min(z1, z2) && z <= Math.max(z1, z2);
         }
+    }
+
+    public static final class PortalTrapSettings {
+        public boolean enabled;
+        public boolean pos1Set;
+        public boolean pos2Set;
+        public int x1, z1, x2, z2;
     }
 
     public static final class OrbitalSettings {
@@ -128,9 +149,25 @@ public final class MachineData {
             d = new MachineData();
         }
         if (d.arrowCannons == null) d.arrowCannons = new LinkedHashMap<>();
+        if (d.arrowDispensers == null) d.arrowDispensers = new LinkedHashMap<>();
         if (d.tntCannons == null) d.tntCannons = new LinkedHashMap<>();
         if (d.ghostBarrels == null) d.ghostBarrels = new LinkedHashMap<>();
-        if (d.portalTrap == null) d.portalTrap = new PortalTrapSettings();
+        if (d.portalTraps == null) d.portalTraps = new LinkedHashMap<>();
+        if (d.portalTrap != null) {
+            PortalTrapSettings old = d.portalTrap;
+            if (old.pos1Set && old.pos2Set) {
+                PortalZone z = new PortalZone();
+                z.enabled = old.enabled;
+                z.pos1Set = true;
+                z.pos2Set = true;
+                z.x1 = old.x1;
+                z.z1 = old.z1;
+                z.x2 = old.x2;
+                z.z2 = old.z2;
+                d.portalTraps.putIfAbsent("zone1", z);
+            }
+            d.portalTrap = null;
+        }
         if (d.orbital == null) d.orbital = new OrbitalSettings();
         if (d.immune == null) d.immune = new LinkedHashSet<>();
         d.file = f;
