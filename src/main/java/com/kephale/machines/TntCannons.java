@@ -45,6 +45,14 @@ public final class TntCannons {
         return null;
     }
 
+    public int clearAll() {
+        int n = mod.data.tntCannons.size();
+        mod.data.tntCannons.clear();
+        wasPowered.clear();
+        nextFire.clear();
+        return n;
+    }
+
     public void forget(String name) {
         wasPowered.remove(name);
         nextFire.remove(name);
