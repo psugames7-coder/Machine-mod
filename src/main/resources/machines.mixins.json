@@ -1,0 +1,19 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "com.kephale.machines.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "BlockItemMixin",
+    "ScreenHandlerMixin",
+    "TotemPopMixin",
+    "HopperMixin",
+    "PortalForcerMixin",
+    "DispenserMixin",
+    "TntExplodeMixin",
+    "SpawnEntityMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

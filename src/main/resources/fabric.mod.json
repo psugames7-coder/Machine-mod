@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "kephale_machines",
+  "version": "${version}",
+  "name": "Machines",
+  "description": "Server side machines: anti elytra arrow cannon, ghost totem barrel, nether portal trap, TNT cannon and orbital strike rod.",
+  "authors": ["Kephale"],
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["com.kephale.machines.MachinesMod"]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "fabric-api": "*"
+  },
+  "mixins": ["machines.mixins.json"]
+}
