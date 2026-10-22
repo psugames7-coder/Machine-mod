@@ -17,7 +17,7 @@ public abstract class DispenserMixin {
     private void kmach$cannon(ServerWorld world, BlockState state, BlockPos pos, CallbackInfo ci) {
         try {
             MachinesMod mod = MachinesMod.INSTANCE;
-            if (mod != null && mod.tntCannons.isCannon(world, pos)) ci.cancel();
+            if (mod != null && (mod.tntCannons.isCannon(world, pos) || mod.arrowDispensers.isCannon(world, pos))) ci.cancel();
         } catch (Throwable ignored) {
         }
     }
