@@ -1,5 +1,6 @@
 package com.kephale.machines;
 
+import com.kephale.machines.mixin.ArrowAccessor;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.minecraft.entity.Entity;
@@ -38,11 +39,12 @@ public final class MachineArrows {
         ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
             Entity direct = source.getSource();
             if (direct == null || !direct.getCommandTags().contains(TAG)) return true;
-            if (entity instanceof ServerPlayerEntity p && mod.isImmune(p.getUuid())) return false;
-            if (direct.getCommandTags().contains(OrbitalRod.TAG)
-                    && mod.data.orbital.selfImmune
-                    && source.getAttacker() == entity) return false;
-            return true;
+            boolean blocked = (entity instanceof ServerPlayerEntity p && mod.isImmune(p.getUuid()))
+                    || (direct.getCommandTags().contains(OrbitalRod.TAG)
+                        && mod.data.orbital.selfImmune
+                        && source.getAttacker() == entity);
+            if (blocked) direct.discard();
+            return !blocked;
         });
     }
 
@@ -50,7 +52,7 @@ public final class MachineArrows {
                       double damage, Entity owner, int lifetime, String extraTag) {
         ArrowEntity arrow = new ArrowEntity(world, pos.x, pos.y, pos.z, new ItemStack(Items.ARROW), null);
         if (owner != null) arrow.setOwner(owner);
-        arrow.pickupType = PersistentProjectileEntity.PickupPermission.DISALLOWED;
+        arrow.pickupType = PersistentProjectileEntity.PickupPermission.ALLOWED;
         arrow.setVelocity(dir.x, dir.y, dir.z, (float) speed, (float) spread);
         arrow.setDamage(speed > 0.01 ? damage / speed : damage);
         arrow.setCritical(false);
@@ -71,9 +73,17 @@ public final class MachineArrows {
                 it.remove();
             } else if (mod.tick >= e.getValue()) {
                 it.remove();
-                dead.add(a);
+                if (!inGround(a)) dead.add(a);
             }
         }
         for (PersistentProjectileEntity a : dead) a.discard();
+    }
+
+    private static boolean inGround(PersistentProjectileEntity a) {
+        try {
+            return ((ArrowAccessor) a).kmach$isInGround();
+        } catch (Throwable t) {
+            return false;
+        }
     }
 }
