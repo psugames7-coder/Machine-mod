@@ -25,7 +25,7 @@ import java.util.UUID;
 public final class MachinesMod implements ModInitializer {
 
     public static final String MOD_ID = "kephale_machines";
-    public static final String VERSION = "1.0.0";
+    public static final String VERSION = "1.0.4";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     public static MachinesMod INSTANCE;
@@ -40,6 +40,7 @@ public final class MachinesMod implements ModInitializer {
     public final ArrowCannons arrowCannons = new ArrowCannons(this);
     public final GhostBarrels ghostBarrels = new GhostBarrels(this);
     public final PortalTrap portalTrap = new PortalTrap(this);
+    public final ArrowDispensers arrowDispensers = new ArrowDispensers(this);
     public final TntCannons tntCannons = new TntCannons(this);
     public final OrbitalRod orbital = new OrbitalRod(this);
 
@@ -75,6 +76,7 @@ public final class MachinesMod implements ModInitializer {
         runScheduled();
         safe("arrows", arrows::tick);
         safe("arrow cannons", () -> arrowCannons.tick(s));
+        safe("arrow dispensers", () -> arrowDispensers.tick(s));
         safe("tnt cannons", () -> tntCannons.tick(s));
         safe("ghost barrels", () -> ghostBarrels.tick(s));
     }
