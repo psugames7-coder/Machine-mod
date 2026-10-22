@@ -25,6 +25,7 @@ public final class OrbitalRod {
             ItemStack stack = player.getStackInHand(hand);
             if (!stack.isOf(Items.FISHING_ROD) || !Tagging.is(stack, Tagging.ORBITAL_ROD)) return ActionResult.PASS;
             Tagging.strip(stack);
+            stack.damage(1, sp, hand);
             fire(sp);
             return ActionResult.SUCCESS;
         });
