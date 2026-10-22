@@ -4,6 +4,7 @@
   "package": "com.kephale.machines.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "ArrowAccessor",
     "BlockItemMixin",
     "ScreenHandlerMixin",
     "TotemPopMixin",
