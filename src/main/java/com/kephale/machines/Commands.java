@@ -60,6 +60,9 @@ public final class Commands {
                         .then(portalTrap())
                         .then(tntCannon())
                         .then(orbital())
+                        .then(wither())
+                        .then(potionOrbital())
+                        .then(remote())
                         .then(clear())));
     }
 
@@ -592,6 +595,119 @@ public final class Commands {
                         (c, v) -> { mod.data.orbital.arrowLifetime = v; return "Arrows still flying after " + v + " ticks are removed."; }));
     }
 
+    private static LiteralArgumentBuilder<ServerCommandSource> wither() {
+        return literal("wither")
+                .then(literal("give")
+                        .executes(ctx -> run(ctx, c -> give(c.getSource().getPlayerOrThrow(), mod.witherRod.makeRod(null, false), "wither rod")))
+                        .then(argument("player", EntityArgumentType.player())
+                                .executes(ctx -> run(ctx, c -> give(EntityArgumentType.getPlayer(c, "player"),
+                                        mod.witherRod.makeRod(null, false), "wither rod")))
+                                .then(literal("unbreakable").executes(ctx -> run(ctx, c -> give(EntityArgumentType.getPlayer(c, "player"),
+                                        mod.witherRod.makeRod(null, true), "unbreakable wither rod"))))
+                                .then(argument("durability", IntegerArgumentType.integer(1, 1000000))
+                                        .executes(ctx -> run(ctx, c -> {
+                                            int d = IntegerArgumentType.getInteger(c, "durability");
+                                            return give(EntityArgumentType.getPlayer(c, "player"),
+                                                    mod.witherRod.makeRod(d, false), "wither rod (durability " + d + ")");
+                                        })))))
+                .then(literal("info").executes(ctx -> show(ctx, c -> {
+                    MachineData.WitherSettings s = mod.data.wither;
+                    return "Wither rod: 3 skulls from wither head positions above the shooter"
+                            + "\n range " + fmt(s.range) + ", charged " + onOff(s.charged) + ", converge " + onOff(s.converge)
+                            + "\n shooter immune " + onOff(s.selfImmune) + ", reusable " + onOff(s.reusable)
+                            + ", lifetime " + s.lifetime;
+                })))
+                .then(dbl("range", 4, 512,
+                        c -> "Range: " + fmt(mod.data.wither.range) + " blocks",
+                        (c, v) -> { mod.data.wither.range = v; return "Aim range " + fmt(v) + " blocks."; }))
+                .then(bool("charged",
+                        c -> "Charged (blue) skulls: " + onOff(mod.data.wither.charged),
+                        (c, v) -> { mod.data.wither.charged = v; return "Charged (blue) skulls " + onOff(v); }))
+                .then(bool("converge",
+                        c -> "Side skulls converge: " + onOff(mod.data.wither.converge),
+                        (c, v) -> { mod.data.wither.converge = v; return v ? "Side skulls aim at the target too." : "Side skulls fly parallel to the centre skull."; }))
+                .then(bool("selfimmune",
+                        c -> "Shooter immune: " + onOff(mod.data.wither.selfImmune),
+                        (c, v) -> { mod.data.wither.selfImmune = v; return "Shooter immune " + onOff(v); }))
+                .then(bool("reusable",
+                        c -> "Reusable: " + onOff(mod.data.wither.reusable),
+                        (c, v) -> { mod.data.wither.reusable = v; return v ? "Wither rods keep working until they break." : "Wither rods work once, then become normal rods."; }))
+                .then(integer("lifetime", 1, 6000,
+                        c -> "Lifetime: " + mod.data.wither.lifetime + " ticks",
+                        (c, v) -> { mod.data.wither.lifetime = v; return "Skulls still flying after " + v + " ticks are removed."; }));
+    }
+
+    private static LiteralArgumentBuilder<ServerCommandSource> potionOrbital() {
+        return literal("potionorbital")
+                .then(literal("give")
+                        .then(argument("player", EntityArgumentType.player())
+                                .then(argument("potion", StringArgumentType.word())
+                                        .suggests((ctx, b) -> mod.potionOrbital.suggest(ctx, b))
+                                        .executes(ctx -> run(ctx, c -> givePotionRod(c, null, false)))
+                                        .then(literal("unbreakable").executes(ctx -> run(ctx, c -> givePotionRod(c, null, true))))
+                                        .then(argument("durability", IntegerArgumentType.integer(1, 1000000))
+                                                .executes(ctx -> run(ctx, c -> givePotionRod(c, IntegerArgumentType.getInteger(c, "durability"), false)))))))
+                .then(literal("potions").executes(ctx -> show(ctx, c -> {
+                    StringBuilder sb = new StringBuilder("Potions:");
+                    for (String label : mod.potionOrbital.labels().keySet()) {
+                        sb.append("\n §e").append(label).append(" §7").append(mod.potionOrbital.describe(label));
+                    }
+                    return sb.toString();
+                })))
+                .then(literal("info").executes(ctx -> show(ctx, c -> {
+                    MachineData.PotionOrbitalSettings s = mod.data.potionOrbital;
+                    return "Potion orbital: " + s.rings + " rings out to radius " + fmt(s.radius)
+                            + ", spacing " + fmt(s.spacing) + " (" + mod.potionOrbital.arrowCount() + " potions)"
+                            + "\n height Y " + fmt(s.height) + ", velocity " + fmt(s.velocity) + ", wave delay " + s.waveDelay;
+                })))
+                .then(dbl("radius", 0.5, 100,
+                        c -> "Radius: " + fmt(mod.data.potionOrbital.radius),
+                        (c, v) -> { mod.data.potionOrbital.radius = v; return "Radius " + fmt(v) + " (" + mod.potionOrbital.arrowCount() + " potions)."; }))
+                .then(integer("rings", 0, 20,
+                        c -> "Rings: " + mod.data.potionOrbital.rings,
+                        (c, v) -> { mod.data.potionOrbital.rings = v; return "Rings " + v + " (" + mod.potionOrbital.arrowCount() + " potions)."; }))
+                .then(dbl("spacing", 0.25, 50,
+                        c -> "Spacing: " + fmt(mod.data.potionOrbital.spacing) + " blocks",
+                        (c, v) -> { mod.data.potionOrbital.spacing = v; return "Potion spacing " + fmt(v) + " blocks (" + mod.potionOrbital.arrowCount() + " potions)."; }))
+                .then(dbl("height", -64, 2000,
+                        c -> "Height: Y " + fmt(mod.data.potionOrbital.height),
+                        (c, v) -> { mod.data.potionOrbital.height = v; return "Spawn height Y " + fmt(v) + "."; }))
+                .then(dbl("velocity", 0.1, 20,
+                        c -> "Velocity: " + fmt(mod.data.potionOrbital.velocity) + " blocks per tick",
+                        (c, v) -> { mod.data.potionOrbital.velocity = v; return "Velocity " + fmt(v) + " blocks per tick."; }))
+                .then(integer("wavedelay", 0, 200,
+                        c -> "Wave delay: " + mod.data.potionOrbital.waveDelay + " ticks",
+                        (c, v) -> { mod.data.potionOrbital.waveDelay = v; return "Wave delay " + v + " ticks."; }));
+    }
+
+    private static String givePotionRod(CommandContext<ServerCommandSource> c, Integer durability, boolean unbreakable)
+            throws CommandSyntaxException {
+        String input = StringArgumentType.getString(c, "potion");
+        String id = mod.potionOrbital.resolve(input);
+        if (id == null) return "§cUnknown potion " + input + ". Use /machine potionorbital potions to see them all.";
+        ServerPlayerEntity p = EntityArgumentType.getPlayer(c, "player");
+        String what = "potion orbital rod (" + input + (unbreakable ? ", unbreakable" : durability != null ? ", durability " + durability : "") + ")";
+        return give(p, mod.potionOrbital.makeRod(id, durability, unbreakable), what);
+    }
+
+    private static LiteralArgumentBuilder<ServerCommandSource> remote() {
+        return literal("remote")
+                .then(bool("on",
+                        c -> "Remote rods: " + onOff(mod.data.remote.enabled),
+                        (c, v) -> { mod.data.remote.enabled = v; return "Remote rods " + onOff(v); }))
+                .then(literal("list").executes(ctx -> show(ctx, c -> {
+                    if (mod.remoteRods.links().isEmpty()) return "No active remotes.";
+                    StringBuilder sb = new StringBuilder("Active remotes:");
+                    for (Map.Entry<String, net.minecraft.entity.projectile.FishingBobberEntity> e : mod.remoteRods.links().entrySet()) {
+                        BlockPos p = e.getValue().getBlockPos();
+                        sb.append("\n §e").append(e.getKey()).append(" §7")
+                                .append(MachinesMod.dimOf(e.getValue().getEntityWorld())).append(" ")
+                                .append(p.getX()).append(" ").append(p.getY()).append(" ").append(p.getZ());
+                    }
+                    return sb.toString();
+                })));
+    }
+
     private static int orbitalArrowCount() {
         MachineData.OrbitalSettings s = mod.data.orbital;
         int total = 1;
@@ -700,6 +816,9 @@ public final class Commands {
                 + "\n§e/machine portaltrap §7create, list, remove, <name> zone pos1/pos2/get, on, depth, shell, boxexisting, info"
                 + "\n§e/machine tntcannon §7add <name> (look at dispenser), list, remove, <name> count/interval/velocity/spread/fuse/mode/blockdamage/drops/on/info"
                 + "\n§e/machine orbital §7give [player] [durability|unbreakable], radius/rings/spacing/height/velocity/damage/wavedelay/selfimmune/lifetime/info"
+                + "\n§e/machine wither §7give [player] [durability|unbreakable], range/charged/converge/selfimmune/reusable/lifetime/info"
+                + "\n§e/machine potionorbital §7give <player> <potion> [durability|unbreakable], potions, radius/rings/spacing/height/velocity/wavedelay/info"
+                + "\n§e/machine remote §7on, list"
                 + "\n§e/machine immune §7list, <player> true/false/get"
                 + "\n§e/machine clear §7antielytra/arrowcannon/tntcannon/portaltrap/ghostbarrel/all");
         return 1;
