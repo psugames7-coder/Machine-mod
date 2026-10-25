@@ -23,6 +23,9 @@ public final class MachineData {
     public Map<String, PortalZone> portalTraps = new LinkedHashMap<>();
     public PortalTrapSettings portalTrap;
     public OrbitalSettings orbital = new OrbitalSettings();
+    public WitherSettings wither = new WitherSettings();
+    public PotionOrbitalSettings potionOrbital = new PotionOrbitalSettings();
+    public RemoteSettings remote = new RemoteSettings();
     public Set<String> immune = new LinkedHashSet<>();
 
     private transient Path file;
@@ -134,6 +137,28 @@ public final class MachineData {
         public int arrowLifetime = 200;
     }
 
+    public static final class WitherSettings {
+        public double range = 128.0;
+        public boolean charged = false;
+        public boolean converge = false;
+        public boolean selfImmune = true;
+        public boolean reusable = false;
+        public int lifetime = 200;
+    }
+
+    public static final class PotionOrbitalSettings {
+        public double radius = 5.0;
+        public int rings = 2;
+        public double spacing = 2.0;
+        public double height = 322.0;
+        public double velocity = 3.0;
+        public int waveDelay = 0;
+    }
+
+    public static final class RemoteSettings {
+        public boolean enabled = true;
+    }
+
     public static MachineData load(Path dir) {
         Path f = dir.resolve("machines.json");
         MachineData d;
@@ -169,6 +194,9 @@ public final class MachineData {
             d.portalTrap = null;
         }
         if (d.orbital == null) d.orbital = new OrbitalSettings();
+        if (d.wither == null) d.wither = new WitherSettings();
+        if (d.potionOrbital == null) d.potionOrbital = new PotionOrbitalSettings();
+        if (d.remote == null) d.remote = new RemoteSettings();
         if (d.immune == null) d.immune = new LinkedHashSet<>();
         d.file = f;
         d.save();
