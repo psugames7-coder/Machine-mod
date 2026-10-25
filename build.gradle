@@ -1,38 +1,13 @@
-plugins {
-    id 'fabric-loom' version "${loom_version}"
-    id 'maven-publish'
-}
+org.gradle.jvmargs=-Xmx2G
+org.gradle.parallel=true
 
-version = project.mod_version
-group = project.maven_group
+loom_version=1.17-SNAPSHOT
 
-base { archivesName = project.archives_base_name }
+minecraft_version=1.21.11
+yarn_mappings=1.21.11+build.6
+loader_version=0.19.5
+fabric_version=0.141.6+1.21.11
 
-repositories {
-    maven { name = 'Fabric'; url = uri('https://maven.fabricmc.net/') }
-    mavenCentral()
-}
-
-dependencies {
-    minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
-    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-}
-
-processResources {
-    inputs.property "version", project.version
-    filesMatching("fabric.mod.json") {
-        expand "version": project.version
-    }
-}
-
-tasks.withType(JavaCompile).configureEach {
-    it.options.release = 21
-}
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
-    withSourcesJar()
-}
+mod_version=1.0.5
+maven_group=com.kephale
+archives_base_name=machines
