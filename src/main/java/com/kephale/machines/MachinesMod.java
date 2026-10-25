@@ -25,7 +25,7 @@ import java.util.UUID;
 public final class MachinesMod implements ModInitializer {
 
     public static final String MOD_ID = "kephale_machines";
-    public static final String VERSION = "1.0.4";
+    public static final String VERSION = "1.0.5";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     public static MachinesMod INSTANCE;
@@ -43,6 +43,9 @@ public final class MachinesMod implements ModInitializer {
     public final ArrowDispensers arrowDispensers = new ArrowDispensers(this);
     public final TntCannons tntCannons = new TntCannons(this);
     public final OrbitalRod orbital = new OrbitalRod(this);
+    public final WitherRod witherRod = new WitherRod(this);
+    public final PotionOrbital potionOrbital = new PotionOrbital(this);
+    public final RemoteRods remoteRods = new RemoteRods(this);
 
     private final List<Scheduled> scheduled = new ArrayList<>();
 
@@ -65,6 +68,9 @@ public final class MachinesMod implements ModInitializer {
         arrows.register();
         ghostBarrels.register();
         orbital.register();
+        witherRod.register();
+        potionOrbital.register();
+        remoteRods.register();
         Commands.register(this);
 
         LOGGER.info("Machines {} loaded", VERSION);
@@ -79,6 +85,8 @@ public final class MachinesMod implements ModInitializer {
         safe("arrow dispensers", () -> arrowDispensers.tick(s));
         safe("tnt cannons", () -> tntCannons.tick(s));
         safe("ghost barrels", () -> ghostBarrels.tick(s));
+        safe("wither skulls", witherRod::tick);
+        safe("remote rods", () -> remoteRods.tick(s));
     }
 
     private void runScheduled() {
