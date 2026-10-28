@@ -15,6 +15,9 @@ import java.util.Set;
 public final class MachineData {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final int DATA_VERSION = 2;
+
+    public int dataVersion = 0;
 
     public Map<String, ArrowCannon> arrowCannons = new LinkedHashMap<>();
     public Map<String, ArrowDispenser> arrowDispensers = new LinkedHashMap<>();
@@ -43,7 +46,7 @@ public final class MachineData {
         public boolean hasTurret;
         public int turretX, turretY, turretZ;
         public double speed = 12.0;
-        public double damage = 6.0;
+        public double damage = 40.0;
         public int interval = 5;
         public int count = 1;
         public double spread = 0.0;
@@ -75,7 +78,7 @@ public final class MachineData {
         public String mode = "burst";
         public double speed = 12.0;
         public double spread = 0.0;
-        public double damage = 6.0;
+        public double damage = 40.0;
         public int arrowLifetime = 80;
     }
 
@@ -138,17 +141,21 @@ public final class MachineData {
     }
 
     public static final class WitherSettings {
-        public double range = 128.0;
+        public double radius = 25.0;
+        public int rings = 10;
+        public double spacing = 3.0;
+        public double height = 322.0;
+        public double speed = 1.0;
+        public int waveDelay = 0;
         public boolean charged = false;
-        public boolean converge = false;
         public boolean selfImmune = true;
         public boolean reusable = false;
-        public int lifetime = 200;
+        public int lifetime = 400;
     }
 
     public static final class PotionOrbitalSettings {
-        public double radius = 5.0;
-        public int rings = 2;
+        public double radius = 8.0;
+        public int rings = 4;
         public double spacing = 2.0;
         public double height = 322.0;
         public double velocity = 3.0;
@@ -198,6 +205,13 @@ public final class MachineData {
         if (d.potionOrbital == null) d.potionOrbital = new PotionOrbitalSettings();
         if (d.remote == null) d.remote = new RemoteSettings();
         if (d.immune == null) d.immune = new LinkedHashSet<>();
+        if (d.dataVersion < 2) {
+            d.wither = new WitherSettings();
+            d.potionOrbital = new PotionOrbitalSettings();
+            for (ArrowCannon a : d.arrowCannons.values()) if (a.damage == 6.0) a.damage = 40.0;
+            for (ArrowDispenser a : d.arrowDispensers.values()) if (a.damage == 6.0) a.damage = 40.0;
+        }
+        d.dataVersion = DATA_VERSION;
         d.file = f;
         d.save();
         return d;
