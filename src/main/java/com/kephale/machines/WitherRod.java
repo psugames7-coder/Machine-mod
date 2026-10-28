@@ -1,5 +1,6 @@
 package com.kephale.machines;
 
+import com.kephale.machines.mixin.ExplosiveProjectileAccessor;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
@@ -12,7 +13,6 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Unit;
-import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.Vec3d;
 
 import java.util.ArrayList;
@@ -25,6 +25,7 @@ public final class WitherRod {
 
     public static final String KIND = "wither_rod";
     public static final String TAG = "kmach_wither";
+    private static final Vec3d DOWN = new Vec3d(0, -1, 0);
 
     private final MachinesMod mod;
     private final Map<Entity, Long> expiry = new IdentityHashMap<>();
@@ -67,42 +68,58 @@ public final class WitherRod {
         return rod;
     }
 
-    public void fire(ServerPlayerEntity shooter) {
-        ServerWorld world = (ServerWorld) shooter.getEntityWorld();
+    public void fire(ServerPlayerEntity caller) {
+        ServerWorld world = (ServerWorld) caller.getEntityWorld();
+        Vec3d at = caller.getEntityPos();
         MachineData.WitherSettings s = mod.data.wither;
-
-        Vec3d eye = shooter.getEyePos();
-        Vec3d look = shooter.getRotationVec(1.0f);
-        HitResult hit = shooter.raycast(s.range, 0.0f, false);
-        Vec3d target = hit.getType() == HitResult.Type.MISS ? eye.add(look.multiply(s.range)) : hit.getPos();
-
-        double x = shooter.getX(), y = shooter.getY(), z = shooter.getZ();
-        Vec3d center = new Vec3d(x, y + 3.0, z);
-        Vec3d dir = target.subtract(center);
-        dir = dir.lengthSquared() < 1.0E-6 ? look : dir.normalize();
-
-        shoot(world, shooter, center, dir, s);
-        for (int i = 1; i <= 2; i++) {
-            double f = Math.toRadians(shooter.getYaw() + 180.0 * (i - 1));
-            Vec3d head = new Vec3d(x + Math.cos(f) * 1.3, y + 2.2, z + Math.sin(f) * 1.3);
-            Vec3d d = dir;
-            if (s.converge) {
-                Vec3d to = target.subtract(head);
-                if (to.lengthSquared() > 1.0E-6) d = to.normalize();
-            }
-            shoot(world, shooter, head, d, s);
+        int rings = Math.max(0, s.rings);
+        for (int i = 0; i <= rings; i++) {
+            final int ring = i;
+            mod.schedule(ring * Math.max(0, s.waveDelay), () -> spawnRing(world, at.x, at.z, ring, rings, s, caller));
         }
-        MachinesMod.sound(world, x, y + 3.0, z, "entity.wither.shoot", 1.0f, 1.0f);
+        MachinesMod.sound(world, at.x, at.y, at.z, "entity.wither.shoot", 2.0f, 0.6f);
     }
 
-    private void shoot(ServerWorld world, ServerPlayerEntity owner, Vec3d pos, Vec3d dir, MachineData.WitherSettings s) {
-        WitherSkullEntity skull = new WitherSkullEntity(world, owner, dir);
+    private void spawnRing(ServerWorld world, double x, double z, int ring, int rings,
+                           MachineData.WitherSettings s, ServerPlayerEntity owner) {
+        if (ring == 0) {
+            spawn(world, x, z, s, owner);
+            return;
+        }
+        double r = s.radius * ring / rings;
+        int n = Math.max(1, (int) Math.round(2 * Math.PI * r / Math.max(0.25, s.spacing)));
+        for (int k = 0; k < n; k++) {
+            double a = 2 * Math.PI * k / n;
+            spawn(world, x + r * Math.cos(a), z + r * Math.sin(a), s, owner);
+        }
+    }
+
+    private void spawn(ServerWorld world, double x, double z, MachineData.WitherSettings s, ServerPlayerEntity owner) {
+        WitherSkullEntity skull = new WitherSkullEntity(world, owner, DOWN);
         skull.setOwner(owner);
         if (s.charged) skull.setCharged(true);
-        skull.setPosition(pos.x, pos.y, pos.z);
+        skull.setPosition(x, s.height, z);
+        if (s.speed != 1.0) {
+            try {
+                ExplosiveProjectileAccessor acc = (ExplosiveProjectileAccessor) skull;
+                acc.kmach$setAccelerationPower(acc.kmach$getAccelerationPower() * s.speed);
+                skull.setVelocity(skull.getVelocity().multiply(s.speed));
+            } catch (Throwable ignored) {
+            }
+        }
         skull.addCommandTag(TAG);
         expiry.put(skull, mod.tick + Math.max(1, s.lifetime));
         world.spawnEntity(skull);
+    }
+
+    public int skullCount() {
+        MachineData.WitherSettings s = mod.data.wither;
+        int total = 1;
+        for (int i = 1; i <= s.rings; i++) {
+            double r = s.radius * i / Math.max(1, s.rings);
+            total += Math.max(1, (int) Math.round(2 * Math.PI * r / Math.max(0.25, s.spacing)));
+        }
+        return total;
     }
 
     public void tick() {
