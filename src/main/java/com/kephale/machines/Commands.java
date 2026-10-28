@@ -598,37 +598,50 @@ public final class Commands {
     private static LiteralArgumentBuilder<ServerCommandSource> wither() {
         return literal("wither")
                 .then(literal("give")
-                        .executes(ctx -> run(ctx, c -> give(c.getSource().getPlayerOrThrow(), mod.witherRod.makeRod(null, false), "wither rod")))
+                        .executes(ctx -> run(ctx, c -> give(c.getSource().getPlayerOrThrow(), mod.witherRod.makeRod(null, false), "wither orbital rod")))
                         .then(argument("player", EntityArgumentType.player())
                                 .executes(ctx -> run(ctx, c -> give(EntityArgumentType.getPlayer(c, "player"),
-                                        mod.witherRod.makeRod(null, false), "wither rod")))
+                                        mod.witherRod.makeRod(null, false), "wither orbital rod")))
                                 .then(literal("unbreakable").executes(ctx -> run(ctx, c -> give(EntityArgumentType.getPlayer(c, "player"),
-                                        mod.witherRod.makeRod(null, true), "unbreakable wither rod"))))
+                                        mod.witherRod.makeRod(null, true), "unbreakable wither orbital rod"))))
                                 .then(argument("durability", IntegerArgumentType.integer(1, 1000000))
                                         .executes(ctx -> run(ctx, c -> {
                                             int d = IntegerArgumentType.getInteger(c, "durability");
                                             return give(EntityArgumentType.getPlayer(c, "player"),
-                                                    mod.witherRod.makeRod(d, false), "wither rod (durability " + d + ")");
+                                                    mod.witherRod.makeRod(d, false), "wither orbital rod (durability " + d + ")");
                                         })))))
                 .then(literal("info").executes(ctx -> show(ctx, c -> {
                     MachineData.WitherSettings s = mod.data.wither;
-                    return "Wither rod: 3 skulls from wither head positions above the shooter"
-                            + "\n range " + fmt(s.range) + ", charged " + onOff(s.charged) + ", converge " + onOff(s.converge)
-                            + "\n shooter immune " + onOff(s.selfImmune) + ", reusable " + onOff(s.reusable)
-                            + ", lifetime " + s.lifetime;
+                    return "Wither orbital: " + s.rings + " rings out to radius " + fmt(s.radius)
+                            + ", spacing " + fmt(s.spacing) + " (" + mod.witherRod.skullCount() + " skulls)"
+                            + "\n height Y " + fmt(s.height) + ", speed x" + fmt(s.speed) + ", wave delay " + s.waveDelay
+                            + "\n charged " + onOff(s.charged) + ", caller immune " + onOff(s.selfImmune)
+                            + ", reusable " + onOff(s.reusable) + ", lifetime " + s.lifetime;
                 })))
-                .then(dbl("range", 4, 512,
-                        c -> "Range: " + fmt(mod.data.wither.range) + " blocks",
-                        (c, v) -> { mod.data.wither.range = v; return "Aim range " + fmt(v) + " blocks."; }))
+                .then(dbl("radius", 1, 200,
+                        c -> "Radius: " + fmt(mod.data.wither.radius),
+                        (c, v) -> { mod.data.wither.radius = v; return "Radius " + fmt(v) + " (" + mod.witherRod.skullCount() + " skulls)."; }))
+                .then(integer("rings", 0, 50,
+                        c -> "Rings: " + mod.data.wither.rings,
+                        (c, v) -> { mod.data.wither.rings = v; return "Rings " + v + " (" + mod.witherRod.skullCount() + " skulls)."; }))
+                .then(dbl("spacing", 0.5, 50,
+                        c -> "Spacing: " + fmt(mod.data.wither.spacing) + " blocks",
+                        (c, v) -> { mod.data.wither.spacing = v; return "Skull spacing " + fmt(v) + " blocks (" + mod.witherRod.skullCount() + " skulls)."; }))
+                .then(dbl("height", -64, 2000,
+                        c -> "Height: Y " + fmt(mod.data.wither.height),
+                        (c, v) -> { mod.data.wither.height = v; return "Spawn height Y " + fmt(v) + "."; }))
+                .then(dbl("speed", 0.1, 20,
+                        c -> "Speed: x" + fmt(mod.data.wither.speed) + " (1 = vanilla wither skull)",
+                        (c, v) -> { mod.data.wither.speed = v; return "Skull speed x" + fmt(v) + " of vanilla."; }))
+                .then(integer("wavedelay", 0, 200,
+                        c -> "Wave delay: " + mod.data.wither.waveDelay + " ticks",
+                        (c, v) -> { mod.data.wither.waveDelay = v; return "Wave delay " + v + " ticks."; }))
                 .then(bool("charged",
                         c -> "Charged (blue) skulls: " + onOff(mod.data.wither.charged),
                         (c, v) -> { mod.data.wither.charged = v; return "Charged (blue) skulls " + onOff(v); }))
-                .then(bool("converge",
-                        c -> "Side skulls converge: " + onOff(mod.data.wither.converge),
-                        (c, v) -> { mod.data.wither.converge = v; return v ? "Side skulls aim at the target too." : "Side skulls fly parallel to the centre skull."; }))
                 .then(bool("selfimmune",
-                        c -> "Shooter immune: " + onOff(mod.data.wither.selfImmune),
-                        (c, v) -> { mod.data.wither.selfImmune = v; return "Shooter immune " + onOff(v); }))
+                        c -> "Caller immune: " + onOff(mod.data.wither.selfImmune),
+                        (c, v) -> { mod.data.wither.selfImmune = v; return "Caller immune " + onOff(v); }))
                 .then(bool("reusable",
                         c -> "Reusable: " + onOff(mod.data.wither.reusable),
                         (c, v) -> { mod.data.wither.reusable = v; return v ? "Wither rods keep working until they break." : "Wither rods work once, then become normal rods."; }))
@@ -816,7 +829,7 @@ public final class Commands {
                 + "\n§e/machine portaltrap §7create, list, remove, <name> zone pos1/pos2/get, on, depth, shell, boxexisting, info"
                 + "\n§e/machine tntcannon §7add <name> (look at dispenser), list, remove, <name> count/interval/velocity/spread/fuse/mode/blockdamage/drops/on/info"
                 + "\n§e/machine orbital §7give [player] [durability|unbreakable], radius/rings/spacing/height/velocity/damage/wavedelay/selfimmune/lifetime/info"
-                + "\n§e/machine wither §7give [player] [durability|unbreakable], range/charged/converge/selfimmune/reusable/lifetime/info"
+                + "\n§e/machine wither §7give [player] [durability|unbreakable], radius/rings/spacing/height/speed/wavedelay/charged/selfimmune/reusable/lifetime/info"
                 + "\n§e/machine potionorbital §7give <player> <potion> [durability|unbreakable], potions, radius/rings/spacing/height/velocity/wavedelay/info"
                 + "\n§e/machine remote §7on, list"
                 + "\n§e/machine immune §7list, <player> true/false/get"
