@@ -11,6 +11,7 @@
     "HopperMixin",
     "PortalForcerMixin",
     "DispenserMixin",
+    "ExplosiveProjectileAccessor",
     "FishingBobberMixin",
     "TntExplodeMixin",
     "SpawnEntityMixin"
