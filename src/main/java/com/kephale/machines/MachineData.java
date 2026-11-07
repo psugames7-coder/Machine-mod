@@ -15,7 +15,7 @@ import java.util.Set;
 public final class MachineData {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final int DATA_VERSION = 2;
+    private static final int DATA_VERSION = 3;
 
     public int dataVersion = 0;
 
@@ -76,10 +76,12 @@ public final class MachineData {
         public int count = 1;
         public int interval = 5;
         public String mode = "burst";
-        public double speed = 12.0;
+        public int version = 2;
+        public double speed = 225.0;
         public double spread = 0.0;
-        public double damage = 40.0;
         public int arrowLifetime = 80;
+        public String shooterUuid;
+        public String shooterName;
     }
 
     public static final class TntCannon {
@@ -133,8 +135,9 @@ public final class MachineData {
         public int rings = 8;
         public double spacing = 2.0;
         public double height = 322.0;
-        public double velocity = 5.0;
-        public double damage = 120.0;
+        public int version = 2;
+        public double velocity = 225.0;
+        public int roundDelay = 10;
         public int waveDelay = 0;
         public boolean selfImmune = true;
         public int arrowLifetime = 200;
@@ -144,7 +147,7 @@ public final class MachineData {
         public double radius = 25.0;
         public int rings = 10;
         public double spacing = 3.0;
-        public double height = 322.0;
+        public double height = 4096.0;
         public double speed = 1.0;
         public int waveDelay = 0;
         public boolean charged = false;
@@ -209,7 +212,16 @@ public final class MachineData {
             d.wither = new WitherSettings();
             d.potionOrbital = new PotionOrbitalSettings();
             for (ArrowCannon a : d.arrowCannons.values()) if (a.damage == 6.0) a.damage = 40.0;
-            for (ArrowDispenser a : d.arrowDispensers.values()) if (a.damage == 6.0) a.damage = 40.0;
+        }
+        if (d.dataVersion < 3) {
+            for (ArrowDispenser a : d.arrowDispensers.values()) {
+                a.speed = 225.0;
+                a.version = 2;
+            }
+            d.orbital.velocity = 225.0;
+            d.orbital.version = 2;
+            d.orbital.roundDelay = 10;
+            d.wither.height = 4096.0;
         }
         d.dataVersion = DATA_VERSION;
         d.file = f;
