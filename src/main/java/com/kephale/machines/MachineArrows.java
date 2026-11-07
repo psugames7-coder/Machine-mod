@@ -21,6 +21,7 @@ import java.util.Map;
 public final class MachineArrows {
 
     public static final String TAG = "kmach_arrow";
+    public static final String CALLER_PREFIX = "kmach_caller_";
 
     private final MachinesMod mod;
     private final Map<PersistentProjectileEntity, Long> expiry = new IdentityHashMap<>();
@@ -42,7 +43,8 @@ public final class MachineArrows {
             boolean blocked = (entity instanceof ServerPlayerEntity p && mod.isImmune(p.getUuid()))
                     || (direct.getCommandTags().contains(OrbitalRod.TAG)
                         && mod.data.orbital.selfImmune
-                        && source.getAttacker() == entity);
+                        && (source.getAttacker() == entity
+                            || direct.getCommandTags().contains(CALLER_PREFIX + entity.getUuidAsString())));
             if (blocked) direct.discard();
             return !blocked;
         });
@@ -58,6 +60,21 @@ public final class MachineArrows {
         arrow.setCritical(false);
         arrow.addCommandTag(TAG);
         if (extraTag != null) arrow.addCommandTag(extraTag);
+        expiry.put(arrow, mod.tick + Math.max(1, lifetime));
+        world.spawnEntity(arrow);
+    }
+
+    public void spawnPowered(ServerWorld world, Vec3d pos, Vec3d dir, double speed, double spread, int power,
+                             Entity owner, int lifetime, String extraTag, String callerTag) {
+        ArrowEntity arrow = new ArrowEntity(world, pos.x, pos.y, pos.z, new ItemStack(Items.ARROW), null);
+        if (owner != null) arrow.setOwner(owner);
+        arrow.pickupType = PersistentProjectileEntity.PickupPermission.ALLOWED;
+        arrow.setVelocity(dir.x, dir.y, dir.z, (float) speed, (float) spread);
+        arrow.setDamage(2.0 + (power > 0 ? 0.5 * power + 0.5 : 0.0));
+        arrow.setCritical(false);
+        arrow.addCommandTag(TAG);
+        if (extraTag != null) arrow.addCommandTag(extraTag);
+        if (callerTag != null) arrow.addCommandTag(callerTag);
         expiry.put(arrow, mod.tick + Math.max(1, lifetime));
         world.spawnEntity(arrow);
     }
