@@ -3,6 +3,7 @@ package com.kephale.machines;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.DispenserBlock;
+import net.minecraft.entity.Entity;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
@@ -12,6 +13,7 @@ import net.minecraft.world.World;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 public final class ArrowDispensers {
 
@@ -86,6 +88,19 @@ public final class ArrowDispensers {
     private void fire(ServerWorld world, BlockPos pos, Direction facing, MachineData.ArrowDispenser c) {
         Vec3d dir = facing.getDoubleVector();
         Vec3d spawn = Vec3d.ofCenter(pos).add(dir.multiply(0.7));
-        mod.arrows.spawn(world, spawn, dir, c.speed, c.spread, c.damage, null, c.arrowLifetime, null);
+        Entity owner = shooter(c);
+        int[] powers = c.version == 1 ? new int[]{5} : new int[]{2, 3, 5};
+        for (int power : powers) {
+            mod.arrows.spawnPowered(world, spawn, dir, c.speed, c.spread, power, owner, c.arrowLifetime, null, null);
+        }
+    }
+
+    private Entity shooter(MachineData.ArrowDispenser c) {
+        if (c.shooterUuid == null || mod.server == null) return null;
+        try {
+            return mod.server.getPlayerManager().getPlayer(UUID.fromString(c.shooterUuid));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 }
