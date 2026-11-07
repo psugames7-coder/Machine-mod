@@ -392,28 +392,15 @@ public final class Commands {
                     for (Map.Entry<String, MachineData.ArrowDispenser> e : mod.data.arrowDispensers.entrySet()) {
                         MachineData.ArrowDispenser t = e.getValue();
                         sb.append("\n §e").append(e.getKey()).append(" §7").append(onOff(t.enabled)).append(" §7")
-                                .append(t.x).append(" ").append(t.y).append(" ").append(t.z);
+                                .append(t.x).append(" ").append(t.y).append(" ").append(t.z)
+                                .append(" version ").append(t.version);
                     }
                     return sb.toString();
                 })))
-                .then(literal("add").then(argument("name", StringArgumentType.word()).executes(ctx -> run(ctx, c -> {
-                    String name = StringArgumentType.getString(c, "name");
-                    if (mod.data.arrowDispensers.containsKey(name)) return "§cArrow cannon " + name + " already exists.";
-                    BlockPos p = lookedAt(c);
-                    if (p == null) return "§cLook at a dispenser.";
-                    ServerWorld w = c.getSource().getWorld();
-                    if (!w.getBlockState(p).isOf(Blocks.DISPENSER)) return "§cThat is not a dispenser.";
-                    String existing = mod.arrowDispensers.nameAt(w, p);
-                    if (existing == null) existing = mod.tntCannons.nameAt(w, p);
-                    if (existing != null) return "§cThat dispenser is already cannon " + existing + ".";
-                    MachineData.ArrowDispenser t = new MachineData.ArrowDispenser();
-                    t.dimension = MachinesMod.dimOf(w);
-                    t.x = p.getX();
-                    t.y = p.getY();
-                    t.z = p.getZ();
-                    mod.data.arrowDispensers.put(name, t);
-                    return "Arrow cannon " + name + " added at " + t.x + " " + t.y + " " + t.z + ".";
-                }))))
+                .then(literal("add").then(argument("name", StringArgumentType.word())
+                        .executes(ctx -> run(ctx, c -> addArrowCannon(c, null)))
+                        .then(literal("as").then(argument("shooter", EntityArgumentType.player())
+                                .executes(ctx -> run(ctx, c -> addArrowCannon(c, EntityArgumentType.getPlayer(c, "shooter"))))))))
                 .then(literal("remove").then(argument("name", StringArgumentType.word()).executes(ctx -> run(ctx, c -> {
                     String name = StringArgumentType.getString(c, "name");
                     mod.arrowDispensers.forget(name);
@@ -422,15 +409,37 @@ public final class Commands {
                 .then(argument("name", StringArgumentType.word())
                         .then(literal("info").executes(ctx -> show(ctx, adGet(t -> "§eArrow cannon§7 " + onOff(t.enabled)
                                 + "\n " + t.dimension + " " + t.x + " " + t.y + " " + t.z
+                                + "\n " + versionText(t.version) + ", speed " + fmt(t.speed) + ", spread " + fmt(t.spread)
                                 + "\n count " + t.count + ", interval " + t.interval + ", mode " + t.mode
-                                + "\n speed " + fmt(t.speed) + ", spread " + fmt(t.spread) + ", damage " + fmt(t.damage)
-                                + ", lifetime " + t.arrowLifetime))))
+                                + ", lifetime " + t.arrowLifetime
+                                + "\n kill credit: " + (t.shooterName == null ? "none (shot by Arrow)" : t.shooterName)))))
                         .then(bool("on",
                                 adGet(t -> "Enabled: " + onOff(t.enabled)),
                                 adSet((t, v) -> { t.enabled = v; return "Arrow cannon " + onOff(v); })))
+                        .then(integer("version", 1, 2,
+                                adGet(t -> "Version: " + versionText(t.version)),
+                                adSet((t, v) -> { t.version = v; return "Version " + versionText(v) + "."; })))
+                        .then(literal("shooter")
+                                .then(literal("get").executes(ctx -> show(ctx, adGet(t ->
+                                        "Kill credit: " + (t.shooterName == null ? "none (shot by Arrow)" : t.shooterName)))))
+                                .then(literal("none").executes(ctx -> run(ctx, c -> {
+                                    MachineData.ArrowDispenser t = ad(c);
+                                    if (t == null) return missingAd(c);
+                                    t.shooterUuid = null;
+                                    t.shooterName = null;
+                                    return "Kill credit removed, deaths read shot by Arrow.";
+                                })))
+                                .then(argument("shooter", EntityArgumentType.player()).executes(ctx -> run(ctx, c -> {
+                                    MachineData.ArrowDispenser t = ad(c);
+                                    if (t == null) return missingAd(c);
+                                    ServerPlayerEntity p = EntityArgumentType.getPlayer(c, "shooter");
+                                    t.shooterUuid = p.getUuidAsString();
+                                    t.shooterName = p.getName().getString();
+                                    return "Kills from this cannon are credited to " + t.shooterName + ".";
+                                }))))
                         .then(integer("count", 1, 50,
-                                adGet(t -> "Count: " + t.count + " arrows per cycle"),
-                                adSet((t, v) -> { t.count = v; return "Arrows per cycle " + v + "."; })))
+                                adGet(t -> "Count: " + t.count + " shots per cycle"),
+                                adSet((t, v) -> { t.count = v; return "Shots per cycle " + v + "."; })))
                         .then(integer("interval", 1, 1200,
                                 adGet(t -> "Interval: " + t.interval + " ticks"),
                                 adSet((t, v) -> { t.interval = v; return "Cycle length " + v + " ticks."; })))
@@ -440,26 +449,52 @@ public final class Commands {
                                     MachineData.ArrowDispenser t = ad(c);
                                     if (t == null) return missingAd(c);
                                     t.mode = "burst";
-                                    return "Mode burst: all arrows at once each cycle.";
+                                    return "Mode burst: all shots at once each cycle.";
                                 })))
                                 .then(literal("stream").executes(ctx -> run(ctx, c -> {
                                     MachineData.ArrowDispenser t = ad(c);
                                     if (t == null) return missingAd(c);
                                     t.mode = "stream";
-                                    return "Mode stream: arrows spread evenly across each cycle.";
+                                    return "Mode stream: shots spread evenly across each cycle.";
                                 }))))
-                        .then(dbl("speed", 0.1, 50,
+                        .then(dbl("speed", 0.1, 1000,
                                 adGet(t -> "Speed: " + fmt(t.speed) + " blocks per tick"),
                                 adSet((t, v) -> { t.speed = v; return "Arrow speed " + fmt(v) + " blocks per tick."; })))
                         .then(dbl("spread", 0, 50,
                                 adGet(t -> "Spread: " + fmt(t.spread)),
                                 adSet((t, v) -> { t.spread = v; return "Spread " + fmt(v) + "."; })))
-                        .then(dbl("damage", 0, 1000,
-                                adGet(t -> "Damage: " + fmt(t.damage)),
-                                adSet((t, v) -> { t.damage = v; return "Arrow damage " + fmt(v) + "."; })))
                         .then(integer("lifetime", 1, 6000,
                                 adGet(t -> "Lifetime: " + t.arrowLifetime + " ticks of flight"),
                                 adSet((t, v) -> { t.arrowLifetime = v; return "Arrows still flying after " + v + " ticks are removed."; }))));
+    }
+
+    private static String addArrowCannon(CommandContext<ServerCommandSource> c, ServerPlayerEntity shooter)
+            throws CommandSyntaxException {
+        String name = StringArgumentType.getString(c, "name");
+        if (mod.data.arrowDispensers.containsKey(name)) return "§cArrow cannon " + name + " already exists.";
+        BlockPos p = lookedAt(c);
+        if (p == null) return "§cLook at a dispenser.";
+        ServerWorld w = c.getSource().getWorld();
+        if (!w.getBlockState(p).isOf(Blocks.DISPENSER)) return "§cThat is not a dispenser.";
+        String existing = mod.arrowDispensers.nameAt(w, p);
+        if (existing == null) existing = mod.tntCannons.nameAt(w, p);
+        if (existing != null) return "§cThat dispenser is already cannon " + existing + ".";
+        MachineData.ArrowDispenser t = new MachineData.ArrowDispenser();
+        t.dimension = MachinesMod.dimOf(w);
+        t.x = p.getX();
+        t.y = p.getY();
+        t.z = p.getZ();
+        if (shooter != null) {
+            t.shooterUuid = shooter.getUuidAsString();
+            t.shooterName = shooter.getName().getString();
+        }
+        mod.data.arrowDispensers.put(name, t);
+        return "Arrow cannon " + name + " added at " + t.x + " " + t.y + " " + t.z
+                + (shooter != null ? ", kills credited to " + t.shooterName : "") + ".";
+    }
+
+    private static String versionText(int version) {
+        return version == 1 ? "1 (one Power 5 arrow)" : "2 (Power 2, 3 and 5 arrows)";
     }
 
     private static LiteralArgumentBuilder<ServerCommandSource> tntCannon() {
@@ -546,44 +581,53 @@ public final class Commands {
     private static LiteralArgumentBuilder<ServerCommandSource> orbital() {
         return literal("orbital")
                 .then(literal("give")
-                        .executes(ctx -> run(ctx, c -> give(c.getSource().getPlayerOrThrow(), mod.orbital.makeRod(null, false), "orbital rod")))
+                        .executes(ctx -> run(ctx, c -> giveOrbital(c, c.getSource().getPlayerOrThrow(), null, false, null)))
                         .then(argument("player", EntityArgumentType.player())
-                                .executes(ctx -> run(ctx, c -> give(EntityArgumentType.getPlayer(c, "player"),
-                                        mod.orbital.makeRod(null, false), "orbital rod")))
-                                .then(literal("unbreakable").executes(ctx -> run(ctx, c -> give(EntityArgumentType.getPlayer(c, "player"),
-                                        mod.orbital.makeRod(null, true), "unbreakable orbital rod"))))
+                                .executes(ctx -> run(ctx, c -> giveOrbital(c, EntityArgumentType.getPlayer(c, "player"), null, false, null)))
+                                .then(literal("as").then(argument("shooter", EntityArgumentType.player())
+                                        .executes(ctx -> run(ctx, c -> giveOrbital(c, EntityArgumentType.getPlayer(c, "player"), null, false,
+                                                EntityArgumentType.getPlayer(c, "shooter"))))))
+                                .then(literal("unbreakable")
+                                        .executes(ctx -> run(ctx, c -> giveOrbital(c, EntityArgumentType.getPlayer(c, "player"), null, true, null)))
+                                        .then(literal("as").then(argument("shooter", EntityArgumentType.player())
+                                                .executes(ctx -> run(ctx, c -> giveOrbital(c, EntityArgumentType.getPlayer(c, "player"), null, true,
+                                                        EntityArgumentType.getPlayer(c, "shooter")))))))
                                 .then(argument("durability", IntegerArgumentType.integer(1, 1000000))
-                                        .executes(ctx -> run(ctx, c -> {
-                                            int d = IntegerArgumentType.getInteger(c, "durability");
-                                            return give(EntityArgumentType.getPlayer(c, "player"),
-                                                    mod.orbital.makeRod(d, false), "orbital rod (durability " + d + ")");
-                                        })))))
+                                        .executes(ctx -> run(ctx, c -> giveOrbital(c, EntityArgumentType.getPlayer(c, "player"),
+                                                IntegerArgumentType.getInteger(c, "durability"), false, null)))
+                                        .then(literal("as").then(argument("shooter", EntityArgumentType.player())
+                                                .executes(ctx -> run(ctx, c -> giveOrbital(c, EntityArgumentType.getPlayer(c, "player"),
+                                                        IntegerArgumentType.getInteger(c, "durability"), false,
+                                                        EntityArgumentType.getPlayer(c, "shooter")))))))))
                 .then(literal("info").executes(ctx -> show(ctx, c -> {
                     MachineData.OrbitalSettings s = mod.data.orbital;
                     return "Orbital strike: " + s.rings + " rings out to radius " + fmt(s.radius)
-                            + ", spacing " + fmt(s.spacing) + " (" + orbitalArrowCount() + " arrows)"
-                            + "\n height Y " + fmt(s.height) + ", velocity " + fmt(s.velocity) + ", damage " + fmt(s.damage)
-                            + "\n wave delay " + s.waveDelay + ", caller immune " + onOff(s.selfImmune)
-                            + ", lifetime " + s.arrowLifetime;
+                            + ", spacing " + fmt(s.spacing) + " (" + orbitalArrowCount() + " arrows per round)"
+                            + "\n " + orbitalVersionText(s.version) + ", round delay " + s.roundDelay + " ticks"
+                            + "\n height Y " + fmt(s.height) + ", velocity " + fmt(s.velocity) + ", wave delay " + s.waveDelay
+                            + "\n caller immune " + onOff(s.selfImmune) + ", lifetime " + s.arrowLifetime;
                 })))
+                .then(integer("version", 1, 2,
+                        c -> "Version: " + orbitalVersionText(mod.data.orbital.version),
+                        (c, v) -> { mod.data.orbital.version = v; return "Version " + orbitalVersionText(v) + "."; }))
+                .then(integer("rounddelay", 0, 200,
+                        c -> "Round delay: " + mod.data.orbital.roundDelay + " ticks",
+                        (c, v) -> { mod.data.orbital.roundDelay = v; return "Ticks between the Power 2, 3 and 5 rounds: " + v + "."; }))
                 .then(dbl("radius", 1, 200,
                         c -> "Radius: " + fmt(mod.data.orbital.radius),
-                        (c, v) -> { mod.data.orbital.radius = v; return "Radius " + fmt(v) + " (" + orbitalArrowCount() + " arrows)."; }))
+                        (c, v) -> { mod.data.orbital.radius = v; return "Radius " + fmt(v) + " (" + orbitalArrowCount() + " arrows per round)."; }))
                 .then(integer("rings", 0, 50,
                         c -> "Rings: " + mod.data.orbital.rings,
-                        (c, v) -> { mod.data.orbital.rings = v; return "Rings " + v + " (" + orbitalArrowCount() + " arrows)."; }))
+                        (c, v) -> { mod.data.orbital.rings = v; return "Rings " + v + " (" + orbitalArrowCount() + " arrows per round)."; }))
                 .then(dbl("spacing", 0.25, 50,
                         c -> "Spacing: " + fmt(mod.data.orbital.spacing) + " blocks",
-                        (c, v) -> { mod.data.orbital.spacing = v; return "Arrow spacing " + fmt(v) + " blocks (" + orbitalArrowCount() + " arrows)."; }))
+                        (c, v) -> { mod.data.orbital.spacing = v; return "Arrow spacing " + fmt(v) + " blocks (" + orbitalArrowCount() + " arrows per round)."; }))
                 .then(dbl("height", -64, 2000,
                         c -> "Height: Y " + fmt(mod.data.orbital.height),
                         (c, v) -> { mod.data.orbital.height = v; return "Spawn height Y " + fmt(v) + "."; }))
-                .then(dbl("velocity", 0.1, 50,
+                .then(dbl("velocity", 0.1, 1000,
                         c -> "Velocity: " + fmt(mod.data.orbital.velocity) + " blocks per tick",
                         (c, v) -> { mod.data.orbital.velocity = v; return "Velocity " + fmt(v) + " blocks per tick."; }))
-                .then(dbl("damage", 0, 1000,
-                        c -> "Damage: " + fmt(mod.data.orbital.damage),
-                        (c, v) -> { mod.data.orbital.damage = v; return "Damage " + fmt(v) + "."; }))
                 .then(integer("wavedelay", 0, 200,
                         c -> "Wave delay: " + mod.data.orbital.waveDelay + " ticks",
                         (c, v) -> { mod.data.orbital.waveDelay = v; return "Wave delay " + v + " ticks."; }))
@@ -593,6 +637,17 @@ public final class Commands {
                 .then(integer("lifetime", 1, 6000,
                         c -> "Lifetime: " + mod.data.orbital.arrowLifetime + " ticks of flight",
                         (c, v) -> { mod.data.orbital.arrowLifetime = v; return "Arrows still flying after " + v + " ticks are removed."; }));
+    }
+
+    private static String giveOrbital(CommandContext<ServerCommandSource> c, ServerPlayerEntity target, Integer durability,
+                                      boolean unbreakable, ServerPlayerEntity shooter) {
+        String what = "orbital rod" + (unbreakable ? " (unbreakable)" : durability != null ? " (durability " + durability + ")" : "")
+                + (shooter != null ? ", kills credited to " + shooter.getName().getString() : "");
+        return give(target, mod.orbital.makeRod(durability, unbreakable, shooter), what);
+    }
+
+    private static String orbitalVersionText(int version) {
+        return version == 1 ? "1 (one round of Power 5 arrows)" : "2 (three rounds: Power 2, then 3, then 5)";
     }
 
     private static LiteralArgumentBuilder<ServerCommandSource> wither() {
@@ -614,7 +669,7 @@ public final class Commands {
                     MachineData.WitherSettings s = mod.data.wither;
                     return "Wither orbital: " + s.rings + " rings out to radius " + fmt(s.radius)
                             + ", spacing " + fmt(s.spacing) + " (" + mod.witherRod.skullCount() + " skulls)"
-                            + "\n height Y " + fmt(s.height) + ", speed x" + fmt(s.speed) + ", wave delay " + s.waveDelay
+                            + "\n height " + witherHeightText() + ", speed x" + fmt(s.speed) + ", wave delay " + s.waveDelay
                             + "\n charged " + onOff(s.charged) + ", caller immune " + onOff(s.selfImmune)
                             + ", reusable " + onOff(s.reusable) + ", lifetime " + s.lifetime;
                 })))
@@ -627,9 +682,16 @@ public final class Commands {
                 .then(dbl("spacing", 0.5, 50,
                         c -> "Spacing: " + fmt(mod.data.wither.spacing) + " blocks",
                         (c, v) -> { mod.data.wither.spacing = v; return "Skull spacing " + fmt(v) + " blocks (" + mod.witherRod.skullCount() + " skulls)."; }))
-                .then(dbl("height", -64, 2000,
-                        c -> "Height: Y " + fmt(mod.data.wither.height),
-                        (c, v) -> { mod.data.wither.height = v; return "Spawn height Y " + fmt(v) + "."; }))
+                .then(literal("height")
+                        .then(literal("get").executes(ctx -> show(ctx, c -> "Height: " + witherHeightText())))
+                        .then(literal("max").executes(ctx -> run(ctx, c -> {
+                            mod.data.wither.height = 4096.0;
+                            return "Skulls spawn at the top of the world.";
+                        })))
+                        .then(argument("value", DoubleArgumentType.doubleArg(-64, 4096)).executes(ctx -> run(ctx, c -> {
+                            mod.data.wither.height = DoubleArgumentType.getDouble(c, "value");
+                            return "Spawn height " + witherHeightText() + ".";
+                        }))))
                 .then(dbl("speed", 0.1, 20,
                         c -> "Speed: x" + fmt(mod.data.wither.speed) + " (1 = vanilla wither skull)",
                         (c, v) -> { mod.data.wither.speed = v; return "Skull speed x" + fmt(v) + " of vanilla."; }))
@@ -648,6 +710,10 @@ public final class Commands {
                 .then(integer("lifetime", 1, 6000,
                         c -> "Lifetime: " + mod.data.wither.lifetime + " ticks",
                         (c, v) -> { mod.data.wither.lifetime = v; return "Skulls still flying after " + v + " ticks are removed."; }));
+    }
+
+    private static String witherHeightText() {
+        return mod.data.wither.height >= 4096.0 ? "max Y (top of the world)" : "Y " + fmt(mod.data.wither.height) + " (capped at the top of the world)";
     }
 
     private static LiteralArgumentBuilder<ServerCommandSource> potionOrbital() {
@@ -824,12 +890,12 @@ public final class Commands {
     private static int help(CommandContext<ServerCommandSource> ctx) {
         msg(ctx, "§6Machines " + MachinesMod.VERSION + " §7(add §fget§7 after any setting to see its value)"
                 + "\n§e/machine antielytra §7create, list, remove, <name> zone/height/turret/speed/damage/interval/count/spread/los/glidingonly/lifetime/on/info"
-                + "\n§e/machine arrowcannon §7add <name> (look at dispenser), list, remove, <name> count/interval/mode/speed/spread/damage/lifetime/on/info"
+                + "\n§e/machine arrowcannon §7add <name> [as <player>] (look at dispenser), list, remove, <name> version/shooter/count/interval/mode/speed/spread/lifetime/on/info"
                 + "\n§e/machine ghostbarrel §7give [player], reset, get (look at barrel), list"
                 + "\n§e/machine portaltrap §7create, list, remove, <name> zone pos1/pos2/get, on, depth, shell, boxexisting, info"
                 + "\n§e/machine tntcannon §7add <name> (look at dispenser), list, remove, <name> count/interval/velocity/spread/fuse/mode/blockdamage/drops/on/info"
-                + "\n§e/machine orbital §7give [player] [durability|unbreakable], radius/rings/spacing/height/velocity/damage/wavedelay/selfimmune/lifetime/info"
-                + "\n§e/machine wither §7give [player] [durability|unbreakable], radius/rings/spacing/height/speed/wavedelay/charged/selfimmune/reusable/lifetime/info"
+                + "\n§e/machine orbital §7give [player] [durability|unbreakable] [as <player>], version/rounddelay/radius/rings/spacing/height/velocity/wavedelay/selfimmune/lifetime/info"
+                + "\n§e/machine wither §7give [player] [durability|unbreakable], radius/rings/spacing/height [max]/speed/wavedelay/charged/selfimmune/reusable/lifetime/info"
                 + "\n§e/machine potionorbital §7give <player> <potion> [durability|unbreakable], potions, radius/rings/spacing/height/velocity/wavedelay/info"
                 + "\n§e/machine remote §7on, list"
                 + "\n§e/machine immune §7list, <player> true/false/get"
