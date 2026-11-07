@@ -98,7 +98,7 @@ public final class WitherRod {
         WitherSkullEntity skull = new WitherSkullEntity(world, owner, DOWN);
         skull.setOwner(owner);
         if (s.charged) skull.setCharged(true);
-        skull.setPosition(x, s.height, z);
+        skull.setPosition(x, Math.min(s.height, world.getTopYInclusive()), z);
         if (s.speed != 1.0) {
             try {
                 ExplosiveProjectileAccessor acc = (ExplosiveProjectileAccessor) skull;
